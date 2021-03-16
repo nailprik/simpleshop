@@ -5,28 +5,35 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from store.models import Product, UserProductRelation
+from store.models import Product, UserProductRelation, Category
 from store.serializers import ProductSerializer, UserProductRelationSerializer
 
 
 class ProductApiTestCase(APITestCase):
     def setUp(self):
-        self.product = Product.objects.create(name='iPhone 7', price=356, params='Super pooper')
+        self.category = Category.objects.create(name='Phone', slug='phones')
+        self.product = Product.objects.create(title='iPhone 7', price=356, description='Super pooper',
+                                              category=self.category, slug='iphone7', params={"asdf": 1})
         self.user = User.objects.create(username='testuser')
 
     def test_get(self):
-        url = reverse('products-list')
+        url = reverse('products-detail', args=(self.product.id,))
         response = self.client.get(url)
-        product1_serializer_data = ProductSerializer([self.product], many=True).data
+        response.data.pop('image', None)
+        product_serializer_data = ProductSerializer(self.product).data
+        product_serializer_data.pop('image', None)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(product1_serializer_data, response.data)
+        self.assertEqual(product_serializer_data, response.data)
 
     def test_create(self):
         url = reverse('products-list')
         data = {
-            'name': 'iPhone 8',
-            'price': '500',
-            'params': 'Super pooper'
+            'title': 'iPhone 8',
+            'price': '356.00',
+            'slug': 'iphone8',
+            'description': 'Super pooper',
+            'params': {"asdf": 1},
+            'category': self.category.id
         }
         self.client.force_login(self.user)
         json_data = json.dumps(data)
@@ -36,21 +43,22 @@ class ProductApiTestCase(APITestCase):
     def test_update(self):
         url = reverse('products-detail', args=(self.product.id,))
         data = {
-            'name': self.product.name,
+            'title': self.product.title,
             'price': '356.00',
-            'params': 'Super pooper cool'
+            'description': 'Super pooper cool',
+            'slug': 'iphone7'
         }
         self.client.force_login(self.user)
         json_data = json.dumps(data)
-        response = self.client.put(url, data=json_data, content_type='application/json')
+        response = self.client.patch(url, data=json_data, content_type='application/json')
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.product.refresh_from_db()
-        self.assertEqual('Super pooper cool', self.product.params)
+        self.assertEqual('Super pooper cool', self.product.description)
 
 
 class ProductCommentTestCase(APITestCase):
     def setUp(self):
-        self.product = Product.objects.create(name='iPhone 7', price=356, params='Super pooper')
+        self.product = Product.objects.create(title='iPhone 7', price=356, description='Super pooper')
         self.user = User.objects.create(username='test')
         self.userproductrelation = UserProductRelation.objects.create(user=self.user, product=self.product, rate=3, comment='Cool')
 
